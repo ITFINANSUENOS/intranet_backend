@@ -20,8 +20,8 @@ class CompanySeeder extends Seeder
                 'updated_at' => now(),
             ],
             [
-                'name_company' => 'Electrocreditos del cauca',
-                'ubication' => 'Medellín, Colombia',
+                'name_company' => 'Arpesod',
+                'ubication' => 'popayan, Colombia',
                 'created_at' => now(),
                 'updated_at' => now(),
             ],

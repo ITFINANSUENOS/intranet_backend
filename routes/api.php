@@ -1,20 +1,16 @@
 <?php
 
 use App\Http\Controllers\CompanyController;
-// Agrega el nuevo controlador
-use App\Http\Controllers\DataCreditoController;
-use App\Http\Controllers\HelpTableController;
-use App\Http\Controllers\InventoryController;
+use App\Http\Controllers\EventController;
+use App\Http\Controllers\NewsController;
+use App\Http\Controllers\ObjectiveController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\PositionController;
-use App\Http\Controllers\ProcesamientoController;
 use App\Http\Controllers\RegionalController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserRoleController;
-use App\Http\Controllers\WalletController;
 use App\Http\Controllers\ProcesamientoDatacreditoController;
-use App\Models\Inventory;
 use Illuminate\Support\Facades\Route;
 
 
@@ -23,8 +19,12 @@ use Illuminate\Support\Facades\Route;
 Route::post('/users/login', [UserController::class, 'login']);
 Route::post('/users', [UserController::class, 'store']); // Registro
 
-Route::middleware('auth:api')->group(function () {
 
+
+Route::middleware('auth:api')->group(function () {
+    Route::get('/news', [NewsController::class, 'index']);
+    Route::get('/objectives', [ObjectiveController::class, 'index']);
+    Route::get('/events', [EventController::class, 'index']);
     // --- Rutas de Autenticación JWT ---
     Route::post('/logout', [UserController::class, 'logout']);
     Route::post('/refresh', [UserController::class, 'refresh']);
@@ -39,6 +39,22 @@ Route::middleware('auth:api')->group(function () {
         Route::apiResource('companies', CompanyController::class);
         Route::apiResource('regionals', RegionalController::class);
         Route::apiResource('positions', PositionController::class);
+
+        
+        Route::post('/news', [NewsController::class, 'store']);
+        Route::post('/news/{news}', [NewsController::class, 'update']); // Usar POST para update con subida de archivo
+        Route::delete('/news/{news}', [NewsController::class, 'destroy']);
+
+        
+        Route::post('/objectives', [ObjectiveController::class, 'store']);
+        Route::put('/objectives/{objective}', [ObjectiveController::class, 'update']);
+        Route::delete('/objectives/{objective}', [ObjectiveController::class, 'destroy']);
+
+        
+        Route::post('/events', [EventController::class, 'store']);
+        
+        Route::put('/events/{event}', [EventController::class, 'update']);
+        Route::delete('/events/{event}', [EventController::class, 'destroy']);
         // Agrgegar rutas para asignar y quitar roles a usuarios
         // Rutas para Roles y Permisos
         Route::apiResource('roles', RoleController::class);
@@ -51,20 +67,32 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/procesamiento/generar-urls', [ProcesamientoDatacreditoController::class, 'generarUrls']);
         Route::post('/procesamiento/iniciar', [ProcesamientoDatacreditoController::class, 'iniciarProceso']);
         Route::get('/procesamiento/estado', [ProcesamientoDatacreditoController::class, 'verificarEstado']);
+        
+    Route::get('/news/{news}', [NewsController::class, 'show']);
+     Route::get('/objectives/{objective}', [ObjectiveController::class, 'show']);
+     Route::get('/events/{event}', [EventController::class, 'show']);
+     
+    
     });
 
     // --- 2. MODULO DE INVENTARIO ---
     Route::middleware('role:Asesor|Administrativo|Gestor|Administrador')->group(function () {
-        Route::apiResource('inventario', InventoryController::class);
+        // Route::get('/events/{event}', [EventController::class, 'show']);
+        // Route::get('/objectives/{objective}', [ObjectiveController::class, 'show']);
+        // Route::get('/news/{news}', [NewsController::class, 'show']);
     });
 
     // --- 3. MODULO MESA DE AYUDA ---
     Route::middleware('role:Administrativo|Gestor|Administrador')->group(function () {
-        Route::apiResource('mesa_ayuda', HelpTableController::class);
+        // Route::get('/events/{event}', [EventController::class, 'show']);
+        // Route::get('/objectives/{objective}', [ObjectiveController::class, 'show']);
+        // Route::get('/news/{news}', [NewsController::class, 'show']);
     });
 
     // --- 4. MODULO DE CARTERA ---
     Route::middleware('role:Gestor|Administrador')->group(function () {
-        Route::apiResource('cartera', WalletController::class);
+        // Route::get('/events/{event}', [EventController::class, 'show']);
+        // Route::get('/objectives/{objective}', [ObjectiveController::class, 'show']);
+        // Route::get('/news/{news}', [NewsController::class, 'show']);
     });
 });

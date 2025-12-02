@@ -11,15 +11,12 @@ class CompanyController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+   public function index()
     {
-        $companies = Company::query()
-        ->included() // Maneja la inclusión de users y posts
-        ->filter()   // Aplica los filtros
-        ->sort()     // Aplica el ordenamiento
-        ->getOrPaginate(); // Devuelve get() o paginate()
-
-    return response()->json($companies);
+        $companies = Company::query()->get();
+        // MODIFICACIÓN CLAVE: Envuelve el listado de empresas en una clave 'data'.
+        // Esto asegura consistencia con la expectativa del frontend.
+        return response()->json(['data' => $companies]); //
     }
 
     /**

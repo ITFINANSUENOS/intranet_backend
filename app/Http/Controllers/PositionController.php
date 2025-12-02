@@ -30,8 +30,8 @@ class PositionController extends Controller
     {
         //
         $request->validate([
-            'name_position'=> 'require|max:255',
-            'description_position'=> 'require|max:255',
+            'name_position'=> 'required|max:255',
+            'description_position'=> 'required|max:255',
         ]);
 
         $position = Position::create([
@@ -58,8 +58,8 @@ class PositionController extends Controller
     {
         //
         $request->validate([
-            'name_position'=>  'require|max::255',
-            'description_position'=>  'require|max::255',
+            'name_position'=>  'required|max::255',
+            'description_position'=>  'required|max::255',
         ]);
 
         $position = Position::find($id);

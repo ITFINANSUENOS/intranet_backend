@@ -35,7 +35,10 @@ use Illuminate\Validation\Rule;
         ]);
 
         // 1. Crear el rol
-        $role = Role::create(['name' => $request->name]);
+        $role = Role::create([
+            'name' => $request->name, 
+            'guard_name' => 'web' // <-- ¡SOLUCIÓN!
+        ]);
 
         // 2. Asignar permisos si se enviaron
         if ($request->has('permissions')) {

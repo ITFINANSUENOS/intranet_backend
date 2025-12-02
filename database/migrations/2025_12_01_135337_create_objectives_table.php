@@ -11,12 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('documents', function (Blueprint $table) {
+        Schema::create('objectives', function (Blueprint $table) {
             $table->id();
-            $table->string('name_document', 255);
-            $table->string('file_path', 255); // Path al archivo
-            $table->string('type_document', 100); // Ej: PDF, JPG
-            $table->string('version', 10)->default('1.0');
+            $table->string('title_objective');
+            $table->text('description_objective')->nullable();
+            $table->date('start_date_objective');
+            $table->date('end_date_objective');
             $table->timestamps();
         });
     }
@@ -26,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('documents');
+        Schema::dropIfExists('objectives');
     }
 };

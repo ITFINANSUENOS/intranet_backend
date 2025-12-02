@@ -4,29 +4,25 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Spatie\Permission\Models\Role as SpatieRole;
 use Illuminate\Database\Eloquent\Model;
 
-class Role extends Model
+class Role extends SpatieRole
 {
     use HasFactory;
 
     protected $fillable = [
-        'name_role',
-        'description_role'
+        'name',
+        'guard_name',
+        
     ];
 
     // Listas para filtros dinámicos
-    protected $allowIncluded = ['users'];
-    protected $allowFilter = ['id', 'name_role', 'description_role'];
+    protected $allowIncluded = ['users', 'permissions']; // Añadimos 'permissions' a la lista permitida
+    protected $allowFilter = ['id', 'name_role', 'description_role']; 
     protected $allowSort = ['id', 'name_role', 'description_role'];
 
     // Relaciones
-    public function users()
-    {
-        // ✅ INTEGRACIÓN/CORRECCIÓN: Se utiliza belongsToMany para la relación N:M
-        // Asumo que la tabla pivote es 'role_users' y las claves son 'role_id' y 'user_id'.
-        return $this->belongsToMany(User::class, 'role_users', 'role_id', 'user_id');
-    }
 
     public function scopeIncluded(Builder $query)
     {
