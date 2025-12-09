@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\CompanyController;
+use App\Http\Controllers\CostCenterController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\NewsController;
 use App\Http\Controllers\ObjectiveController;
@@ -35,6 +36,8 @@ Route::middleware('auth:api')->group(function () {
     Route::middleware('role:Administrador')->group(function () {
         // El CRUD de Usuarios (excepto 'store', que es público para registro)
         Route::apiResource('users', UserController::class)->except(['store']);
+        Route::apiResource('cost-centers', CostCenterController::class);
+        Route::post('regionals/{regional}/cost-centers', [CostCenterController::class, 'storeByRegional']);
 
         Route::apiResource('companies', CompanyController::class);
         Route::apiResource('regionals', RegionalController::class);

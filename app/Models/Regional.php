@@ -11,10 +11,11 @@ class Regional extends Model
     use HasFactory;
 
     protected $fillable = [
+        'id',
         'name_regional',
         'ubication_regional'
     ];
-
+    public $incrementing = false;
     // Listas para filtros dinámicos
     protected $allowIncluded = ['users'];
     protected $allowFilter = ['id', 'name_regional', 'ubication_regional'];
@@ -24,6 +25,10 @@ class Regional extends Model
     public function users()
     {
         return $this->hasMany(User::class, 'user_id');
+    }
+    public function cost_centers()
+    {
+        return $this->hasMany(CostCenter::class);
     }
 
     // Scopes

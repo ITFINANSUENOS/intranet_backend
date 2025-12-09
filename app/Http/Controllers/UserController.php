@@ -61,7 +61,17 @@ class UserController extends Controller
             'company_id'     => 'required|integer|exists:companies,id',
             'regional_id'    => 'required|integer|exists:regionals,id',
             'position_id'    => 'required|integer|exists:positions,id',
+            'cost_center_id' => [
+                'nullable', 
+                'integer', 
+                Rule::exists('cost_centers', 'id')->where(function ($query) use ($request) {
+                    // El Centro de Costo (id) debe tener la Regional (regional_id)
+                    // que el usuario está enviando en el mismo request.
+                    return $query->where('regional_id', $request->regional_id);
+                }),
+            ],
             'password'       => 'required|min:8|max:255',
+            
 
             // --- ¡AÑADIDO! Validación de Rol (de Spatie) ---
             // 'role_name' es más legible que 'role_id'
@@ -77,6 +87,7 @@ class UserController extends Controller
             'company_id'     => $request->company_id,
             'regional_id'    => $request->regional_id,
             'position_id'    => $request->position_id,
+            'cost_center_id' => $request->cost_center_id,
             
             // No usamos Hash::make() porque tu modelo User.php
             // ya tiene el 'cast' de 'password' => 'hashed'
@@ -110,7 +121,7 @@ public function update(Request $request, User $user)
         'name_user'      => 'required|string|max:255',
         'last_name_user' => 'required|string|max:255',
         'birthdate'      => 'nullable|date',
-        'email'          => ['required', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
+        'email'          => ['required', 'email', 'max:255'],
         
         // CORRECCIÓN 1: number_document
         // El error 422 indica que no es reconocido como string. Al quitar la regla 'string'
@@ -121,6 +132,13 @@ public function update(Request $request, User $user)
         'regional_id'    => 'required|integer|exists:regionals,id',
         'position_id'    => 'required|integer|exists:positions,id',
         'password'       => 'nullable|min:8|max:255', 
+        'cost_center_id' => [
+            'nullable', 
+            'integer', 
+            Rule::exists('cost_centers', 'id')->where(function ($query) use ($request) {
+                return $query->where('regional_id', $request->regional_id);
+            }),
+        ],
         'role_name'      => 'required|string|exists:roles,name', 
     ]);
 

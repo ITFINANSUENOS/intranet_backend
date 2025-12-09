@@ -2,11 +2,10 @@
 
 namespace Database\Seeders;
 
-// use App\Models\Role;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 class RolesAndPermissionsSeeder extends Seeder
 {
@@ -15,41 +14,83 @@ class RolesAndPermissionsSeeder extends Seeder
      */
     public function run(): void
     {
-        // 1. Resetear la caché de permisos
-        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+        // 1. Resetear la caché de permisos de Spatie
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
-        // --- 2. CREAR PERMISOS ---
-        // (Nombra los permisos basado en la "acción", no en el rol)
-        Permission::create(['name' => 'gestionar documentos']);
-        Permission::create(['name' => 'usar mesa de ayuda']);
-        Permission::create(['name' => 'ver inventario']);
-        Permission::create(['name' => 'gestionar usuarios']);
-        Permission::create(['name' => 'gestionar roles']);
+        // 2. LISTA MAESTRA DE PERMISOS (Coincide con Sidebar.jsx y Roles.jsx)
+        $permissions = [
+            // --- Acceso General ---
+            'view_dashboard',
 
+            // --- Módulo: Configuración (Administración) ---
+            'view_users',
+            'view_roles',
+            'view_companies',
+            'view_positions',
+            'view_regionals',
+            'view_cost_centers',
 
-        // --- 3. CREAR ROLES y ASIGNAR PERMISOS ---
-        
-        // Rol Asesor (solo ve inventario)
-        $asesorRole = Role::create(['name' => 'Asesor']);
-        $asesorRole->givePermissionTo('ver inventario');
+            // --- Módulo: Publicación ---
+            'view_objectives',
+            'view_events',
+            'view_news',
 
-        // Rol Administrativo (Inventario y Mesa de Ayuda)
-        $adminiRole = Role::create(['name' => 'Administrativo']);
-        $adminiRole->givePermissionTo([
-            'ver inventario',
-            'usar mesa de ayuda'
+            // --- Módulo: Operaciones ---
+            'view_datacredito',
+            'view_inventory',
+            'view_documents', // Anteriormente "gestionar documentos"
+            
+            // --- Soporte (Opcional si quieres restringirlo también) ---
+            'view_help_desk',
+            'view_api_docs',
+        ];
+
+        // Crear permisos en bucle
+        foreach ($permissions as $permission) {
+            Permission::firstOrCreate(['name' => $permission]);
+        }
+
+        // 3. CREAR ROLES Y ASIGNAR PERMISOS INICIALES
+
+        // --- ROL: ASESOR ---
+        // Acceso básico: Dashboard e Inventario
+        $asesorRole = Role::firstOrCreate(['name' => 'ASESOR']);
+        $asesorRole->syncPermissions([
+            'view_dashboard',
+            'view_inventory',
+            'view_help_desk'
         ]);
 
-        // Rol Gestor (Documentos, Mesa de Ayuda, Inventario)
-        $gestorRole = Role::create(['name' => 'Gestor']);
-        $gestorRole->givePermissionTo([
-            'gestionar documentos',
-            'usar mesa de ayuda',
-            'ver inventario'
+        // --- ROL: ADMINISTRATIVO ---
+        // Acceso intermedio: Dashboard, Inventario, Documentos
+        $adminiRole = Role::firstOrCreate(['name' => 'ADMINISTRATIVO']);
+        $adminiRole->syncPermissions([
+            'view_dashboard',
+            'view_inventory',
+            'view_documents',
+            'view_help_desk'
         ]);
 
-        // Rol Administrador (Tiene todos los permisos)
-        $adminRole = Role::create(['name' => 'Administrador']);
-        $adminRole->givePermissionTo(Permission::all());
+        // --- ROL: GESTOR ---
+        // Acceso alto: Publicación completa, Operaciones completas
+        $gestorRole = Role::firstOrCreate(['name' => 'COBRADOR']);
+        $gestorRole->syncPermissions([
+            'view_dashboard',
+            // Publicación
+            'view_objectives',
+            'view_events',
+            'view_news',
+            // Operaciones
+            'view_datacredito',
+            'view_inventory',
+            'view_documents',
+            // Soporte
+            'view_help_desk'
+        ]);
+
+        // --- ROL: ADMINISTRADOR ---
+        // Acceso total a todo el sistema
+        $adminRole = Role::firstOrCreate(['name' => 'Administrador']);
+        $adminRole->syncPermissions(Permission::all());
     }
 }

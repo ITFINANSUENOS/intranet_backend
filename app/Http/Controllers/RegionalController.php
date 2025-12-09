@@ -13,13 +13,10 @@ class RegionalController extends Controller
      */
     public function index()
     {
-        $regionals = Regional::query()
-        ->included() // Maneja la inclusión de users y posts
-        ->filter()   // Aplica los filtros
-        ->sort()     // Aplica el ordenamiento
-        ->getOrPaginate(); // Devuelve get() o paginate()
+        $regionals = Regional::with('cost_centers')->get();
+        $regionals = Regional::query()->get();// Devuelve get() o paginate()
 
-    return response()->json($regionals);
+        return response()->json($regionals);
     }
 
     /**
@@ -29,11 +26,13 @@ class RegionalController extends Controller
     {
         //validacion de campos de la tabla
         $request->validate([
+            'id'=> 'required|unique_regionals,id',
             'name_regional' => 'required|max:255',
             'ubication_regional'  => 'required|max:255',
         ]);
         //funcion para ingresar datos en la tabla
         $regional = Regional::create([
+            'id' => $request->id,
             'name_regional' => $request->name_regional,
             'ubication_regional'  => $request->ubication_regional,
         ]);
@@ -47,8 +46,8 @@ class RegionalController extends Controller
     public function show($id)
     {
         //funciones para buscar los datos por id
-        $regional = Regional::FindOrFail($id);
-        return response()-> json($regional);
+        $regional = Regional::with('cost_centers')->FindOrFail($id);
+        return response()->json($regional);
     }
 
     /**

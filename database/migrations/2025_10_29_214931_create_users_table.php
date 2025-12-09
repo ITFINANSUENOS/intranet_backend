@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('name_user');
             $table->string('last_name_user');
             $table->date('birthdate')->nullable();
-            $table->string('email')->unique();
+            $table->string('email');
             $table->integer('number_document')->unique();
             $table->unsignedBigInteger('company_id');
             $table->foreign('company_id')->references('id')->on('companies')->onDelete('restrict');
@@ -25,6 +25,8 @@ return new class extends Migration
             $table->foreign('position_id')->references('id')->on('positions')->onDelete('restrict');
             $table->unsignedBigInteger('regional_id');
             $table->foreign('regional_id')->references('id')->on('regionals')->onDelete('restrict');
+            $table->unsignedBigInteger('cost_center_id')->nullable(); 
+            $table->foreign('cost_center_id')->references('id')->on('cost_centers')->onDelete('restrict');
             
             $table->string('password');
             $table->rememberToken();

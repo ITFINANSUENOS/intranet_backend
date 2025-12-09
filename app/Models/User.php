@@ -29,6 +29,7 @@ class User extends Authenticatable implements JWTSubject
         'company_id', 
         'regional_id',
         'position_id',
+        'cost_center_id'
     ];
 
    /**
@@ -54,26 +55,16 @@ class User extends Authenticatable implements JWTSubject
     }
 
     // Listas para filtros dinámicos (ajustadas a tus relaciones)
-    protected $allowIncluded = ['company', 'regional', 'position', 'roles']; 
+    protected $allowIncluded = ['company', 'regional', 'position', 'roles', 'costCenter']; 
     protected $allowFilter = ['id', 'email']; 
     protected $allowSort = ['id', 'email', 'created_at'];
 
     // Relaciones
 
-    // --- RELACIÓN DE ROLES (Muchos a Muchos) ---
-
-    // public function roles()
-    // {
-        
-    //     return $this->belongsToMany(Role::class, 'role_users', 'user_id', 'role_id');
-    // }
-
-
-    // public function getRoleNamesAttribute()
-    // {
-        
-    //     return $this->roles->pluck('name_role')->toArray();
-    // }
+public function costCenter()
+    {
+        return $this->belongsTo(CostCenter::class, 'cost_center_id');
+    }
 
     public function company()
     {
