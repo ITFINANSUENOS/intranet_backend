@@ -7,8 +7,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Spatie\Permission\Models\Role;
+use Firebase\JWT\JWT; // <--- NECESARIO PARA generateSsoUrl
 use Illuminate\Support\Facades\Auth; // Lo usaremos para el helper auth()
 use Illuminate\Validation\ValidationException;
+use Tymon\JWTAuth\Facades\JWTAuth;
+use Tymon\JWTAuth\JWT as JWTAuthJWT;
 
 class UserController extends Controller
 {
@@ -32,16 +35,53 @@ class UserController extends Controller
 
     /**
      * Display a listing of the resource.
-     * (Tu código está perfecto, no se toca)
+     * * [MODIFICADO] Implementa la paginación de Laravel.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $users = User::with('roles')
+        // El frontend pide per_page=10, lo usamos por defecto
+        $perPage = $request->get('per_page', 10);
+        
+        $users = User::with(['roles', 'position', 'company']) // Incluimos 'costCenter' para la tabla
+            ->included() 
+            // ->filter() // **IMPORTANTE: Si no tienes el scopeFilter() en el modelo, elimínalo o coméntalo.**
+            ->sort();
+            
+        // =============================================
+        // LÓGICA DE BÚSQUEDA Y FILTRADO (SOLUCIÓN)
+        // =============================================
 
-            ->included() // Maneja la inclusión
-            ->filter()   // Aplica los filtros
-            ->sort()     // Aplica el ordenamiento
-            ->getOrPaginate(); // Devuelve get() o paginate()
+        // 1. Filtro por Nombre/Apellido (Search)
+        if ($request->filled('search')) {
+            $searchTerm = $request->get('search');
+            $users->where(function ($query) use ($searchTerm) {
+                // Busca en name_user O last_name_user
+                $query->where('name_user', 'like', '%' . $searchTerm . '%')
+                      ->orWhere('last_name_user', 'like', '%' . $searchTerm . '%');
+            });
+        }
+        
+        // 2. Filtro por Empresa
+        if ($request->filled('company_id')) {
+            $users->where('company_id', $request->get('company_id'));
+        }
+        
+        // 3. Filtro por Centro de Costo
+        if ($request->filled('cost_center_id')) {
+            $users->where('cost_center_id', $request->get('cost_center_id'));
+        }
+        
+        // 4. Filtro por Posición
+        if ($request->filled('position_id')) {
+            $users->where('position_id', $request->get('position_id'));
+        }
+
+        // =============================================
+        // FIN LÓGICA DE BÚSQUEDA Y FILTRADO
+        // =============================================
+            
+        // Paginación final después de aplicar los filtros
+        $users = $users->paginate($perPage); 
 
         return response()->json($users);
     }
@@ -97,7 +137,9 @@ class UserController extends Controller
         // --- ¡AÑADIDO! Asignar el rol de Spatie al usuario nuevo ---
         $user->assignRole($request->role_name);
 
-        return response()->json($user, 201);
+        // [MODIFICACIÓN] Retornamos el usuario con sus relaciones cargadas para el frontend
+        // para que pueda ser añadido correctamente a la lista paginada.
+        return response()->json($user->load(['roles', 'costCenter', 'company']), 201);
     }
 
     /**
@@ -107,7 +149,7 @@ class UserController extends Controller
     public function show($id)
     {
         // Añadimos 'with' para cargar los roles y permisos del usuario
-        $user = User::with(['roles', 'permissions'])->findOrFail($id);
+        $user = User::with(['roles', 'permissions', 'costCenter', 'company', 'regional', 'position'])->findOrFail($id);
         return response()->json($user);
     }
 
@@ -121,7 +163,7 @@ public function update(Request $request, User $user)
         'name_user'      => 'required|string|max:255',
         'last_name_user' => 'required|string|max:255',
         'birthdate'      => 'nullable|date',
-        'email'          => ['required', 'email', 'max:255'],
+        'email'          => ['required', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
         
         // CORRECCIÓN 1: number_document
         // El error 422 indica que no es reconocido como string. Al quitar la regla 'string'
@@ -171,8 +213,9 @@ public function update(Request $request, User $user)
         return response()->json(['message' => 'Error al asignar el rol: ' . $e->getMessage()], 422);
     }
     
-    // 5. Devuelve el usuario actualizado (con sus roles)
-    return response()->json($user->load('roles'), 200); 
+    // 5. Devuelve el usuario actualizado (con sus roles y costCenter)
+    // [MODIFICACIÓN] Cargamos 'costCenter' para la tabla del frontend
+    return response()->json($user->load(['roles', 'costCenter', 'company']), 200); 
 }
     /**
      * Remove the specified resource from storage.
@@ -261,6 +304,8 @@ public function update(Request $request, User $user)
         return response()->json([
             'access_token' => $token,
             'token_type'   => 'bearer',
+            // [MODIFICACIÓN] Usamos la factoría directamente en lugar de un posible método
+            // paginador si se modificara el helper auth() en el futuro.
             'expires_in'   => auth('api')->factory()->getTTL() * 60, // Expiración en segundos
             
             // Adjuntamos la información del usuario para el frontend
@@ -271,6 +316,92 @@ public function update(Request $request, User $user)
                 'roles'       => $roles,
                 'permissions' => $permissions,
             ]
+        ]);
+    }
+
+   public function generateSsoUrl()
+    {
+        $user = Auth::guard('api')->user(); // Obtiene el usuario autenticado por JWT
+
+        if (!$user) {
+             // Esto solo debería ocurrir si el middleware falló por alguna razón
+             return response()->json(['message' => 'Usuario no autenticado para SSO'], 401);
+        }
+
+        // 1. Configuración de la clave secreta y reclamos
+        $secretKey = env('JWT_SECRET', 'TU-CLAVE-SECRETA-SSO-MUY-LARGA'); 
+        $issuerClaim = config('app.url'); 
+        $audienceClaim = "electrocreditosdelcauca.com";
+        $issuedAtClaim = time();
+        $expireClaim = $issuedAtClaim + 3600; // 1 hora
+
+        // 2. Definición de la Carga Útil (Payload)
+        $payload = [
+            'iss' => $issuerClaim,
+            'aud' => $audienceClaim,
+            'iat' => $issuedAtClaim,
+            'exp' => $expireClaim,
+            'data' => [
+                'id' => $user->id,
+                'email' => $user->email,
+                // **Asegúrate que 'number_document' es el campo correcto para la cédula**
+                'cedula' => $user->number_document 
+            ]
+        ];
+
+        // 3. Codificación del Token SSO
+        // Esto requiere que 'firebase/php-jwt' esté instalado
+        $ssoToken = JWT::encode($payload, $secretKey, 'HS256');
+
+        // 4. Construcción de la URL de destino
+        $baseUrl = 'http://helpdesk.electrocreditosdelcauca.com/sso-login.php';
+        $ssoUrl = $baseUrl . '?token=' . urlencode($ssoToken);
+
+        // 5. Devolver la URL al frontend
+        return response()->json([
+            'sso_url' => $ssoUrl
+        ]);
+    }
+    public function generateInventorySsoUrl()
+    {
+        // 1. Obtiene el usuario autenticado
+        $user = Auth::guard('api')->user(); // Obtiene el usuario autenticado por JWT
+
+        if (!$user) {
+             // Si no hay usuario autenticado (lo que no debería pasar si el middleware funciona)
+             return response()->json(['message' => 'Usuario no autenticado para SSO de Inventario'], 401);
+        }
+
+        // 2. Configuración (puedes ajustar estos valores si son diferentes para el sistema de inventario)
+        // Se recomienda usar una clave secreta *diferente* si el sistema lo soporta, 
+        // pero por simplicidad, usaremos la misma por defecto.
+        $secretKey = env('JWT_SECRET', env('JWT_SECRET', 'TU-CLAVE-SECRETA-SSO-MUY-LARGA')); 
+        $issuedAtClaim = time();
+        $expireClaim = $issuedAtClaim + 300; // Token de corta duración: 5 minutos (ajustable)
+
+        // 3. Definición de la Carga Útil (Payload)
+        // Solo necesitamos la cédula para este sistema
+        $payload = [
+            'iat' => $issuedAtClaim,
+            'exp' => $expireClaim,
+            'data' => [
+                // **Este es el campo requerido por el sistema de Inventario**
+                'cedula' => $user->number_document 
+            ]
+        ];
+
+        // 4. Codificación del Token SSO
+        // Requiere la librería 'firebase/php-jwt'
+        $ssoToken = JWT::encode($payload, $secretKey, 'HS256');
+
+        // 5. Construcción de la URL de destino del sistema de Inventario
+        // **IMPORTANTE: Debes cambiar esta URL por la URL real de tu sistema de Inventario**
+        $baseUrl = 'https://activosfijos.electrocreditosdelcauca.com/sso_login.php'; 
+        $ssoUrl = $baseUrl . '?token=' . urlencode($ssoToken);
+
+        // 6. Devolver la URL al frontend
+        return response()->json([
+            'sso_url' => $ssoUrl
         ]);
     }
 }

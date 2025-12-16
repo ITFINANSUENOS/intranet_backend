@@ -35,6 +35,8 @@ Route::middleware('auth:api')->group(function () {
     // Protegido por el ROL de Spatie
     Route::middleware('role:Administrador')->group(function () {
         // El CRUD de Usuarios (excepto 'store', que es público para registro)
+        Route::get('/sso/inventario', [UserController::class, 'generateInventorySsoUrl']);
+        Route::get('/sso/mesa-de-ayuda', [UserController::class, 'generateSsoUrl']);
         Route::apiResource('users', UserController::class)->except(['store']);
         Route::apiResource('cost-centers', CostCenterController::class);
         Route::post('regionals/{regional}/cost-centers', [CostCenterController::class, 'storeByRegional']);
@@ -80,6 +82,7 @@ Route::middleware('auth:api')->group(function () {
 
     // --- 2. MODULO DE INVENTARIO ---
     Route::middleware('role:Asesor|Administrativo|Gestor|Administrador')->group(function () {
+        Route::get('/sso/inventario', [UserController::class, 'generateInventorySsoUrl']);
         // Route::get('/events/{event}', [EventController::class, 'show']);
         // Route::get('/objectives/{objective}', [ObjectiveController::class, 'show']);
         // Route::get('/news/{news}', [NewsController::class, 'show']);
