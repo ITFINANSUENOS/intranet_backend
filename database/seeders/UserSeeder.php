@@ -260,7 +260,7 @@ class UserSeeder extends Seeder
             ['DIEGO ANDRES', 'MARIN ZAMBRANO', '2026-08-15', 'andresmz829@hotmail.com', '1107084605', 2, 28, 999, '1107084605', 99901, 'ADMINISTRATIVO'],
             ['LAURA VALENTINA', 'VILLA HERRERA', '2026-08-16', 'lvvillah@gmail.com', '1143878298', 1, 29, 999, '1143878298', 99901, 'ADMINISTRATIVO'],
             ['ISMAEL ANTONIO', 'CARCAMO RODRIGUEZ', '2026-08-17', 'isantraxr85@gmail.com', '1089872', 2, 30, 999, '1089872', 99901, 'ADMINISTRATIVO'],
-            ['JOSE JULIAN', 'NARVAEZ MARTINEZ', '2026-08-18', 'facturacionpopayan@gmail.com', '10300964', 2, 31, 999, '10300964', 99901, 'Administrador'],
+            ['JOSE JULIAN', 'NARVAEZ MARTINEZ', '2026-08-18', 'sistemas@electrocreditosdelcauca.com', '10300964', 2, 31, 999, '10300964', 99901, 'Administrador'],
             ['CARLOS FRANCISCO', 'CERON MAMIAN', '2026-08-19', 'carlosceron10@hotmail.com', '1061728358', 2, 32, 999, '1061728358', 99901, 'ADMINISTRATIVO'],
             ['VIVYAN CATALINA', 'FAJARDO MUNOZ', '2026-08-20', 'catalinafajardom@outlook.com', '1061716558', 2, 33, 999, '1061716558', 99901, 'ADMINISTRATIVO'],
             ['RENGIFO SORAYA', 'RIVERA RENGIFO', '2026-08-21', 'sorire@hotmail.com', '25292342', 2, 34, 999, '25292342', 99901, 'ADMINISTRATIVO'],

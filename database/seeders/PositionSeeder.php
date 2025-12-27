@@ -50,13 +50,6 @@ class PositionSeeder extends Seeder
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
-            [
-                'name_position' => 'Analista de Riesgo',
-                'description_position' => 'Evaluación y monitoreo de los riesgos financieros y operativos de la empresa.',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-           
             // Cargos de Asesoría Comercial
             [
                 'name_position' => 'ASESOR COMERCIAL EXTERNO',

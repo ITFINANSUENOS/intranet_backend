@@ -10,10 +10,14 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
 
-# 3. COPIAR DEPENDENCIAS (Esto asegura que sean las exactas de tu .lock)
+# --- INTEGRACIÓN DE CONFIGURACIÓN PERSONALIZADA ---
+# Copiamos tu archivo ini a la carpeta de configuración oficial de PHP
+COPY ./docker/php/php-extra.ini /usr/local/etc/php/conf.d/php-extra.ini
+
+# 3. COPIAR DEPENDENCIAS
 COPY composer.json composer.lock ./
 
-# 4. Instalar sin ejecutar scripts aún (evita errores si el código no está completo)
+# 4. Instalar dependencias
 RUN composer install --no-interaction --no-plugins --no-scripts --prefer-dist
 
 # 5. Copiar el resto del proyecto
