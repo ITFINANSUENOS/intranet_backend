@@ -15,6 +15,7 @@ use App\Http\Controllers\UserRoleController;
 use App\Http\Controllers\ProcesamientoDatacreditoController;
 use App\Http\Controllers\ReportesController;
 use App\Http\Controllers\WalletController;
+
 use Illuminate\Support\Facades\Route;
 
 
@@ -76,11 +77,22 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/procesamiento/iniciar', [ProcesamientoDatacreditoController::class, 'iniciarProceso']);
         Route::get('/procesamiento/estado', [ProcesamientoDatacreditoController::class, 'verificarEstado']);
         
-    Route::get('/news/{news}', [NewsController::class, 'show']);
-     Route::get('/objectives/{objective}', [ObjectiveController::class, 'show']);
-     Route::get('/events/{event}', [EventController::class, 'show']);
-        Route::post('/reportes/cargar-general', [ReportesController::class, 'cargar']);
-    
+        Route::get('/news/{news}', [NewsController::class, 'show']);
+        Route::get('/objectives/{objective}', [ObjectiveController::class, 'show']);
+        Route::get('/events/{event}', [EventController::class, 'show']);
+       Route::prefix('reportes')->group(function () {
+        Route::post('/generar-url', [ReportesController::class, 'generarUrlSubida']);
+        Route::post('/iniciar-procesamiento', [ReportesController::class, 'iniciarProcesamiento']);
+        Route::get('/activo', [ReportesController::class, 'getActivo']);
+    });
+
+    // Rutas de visualización de datos (Wallet)
+    Route::prefix('wallet')->group(function () {
+        Route::get('/init/{modulo}', [WalletController::class, 'initDashboard']);
+        Route::post('/buscar', [WalletController::class, 'buscar']);
+    });
+
+    });
     
     });
 
@@ -88,9 +100,7 @@ Route::middleware('auth:api')->group(function () {
     Route::middleware('role:ASESOR|ADMINISTRATIVO|GESTOR|Administrador')->group(function () {
          Route::get('/sso/inventario', [AuthController::class, 'generateInventorySsoUrl']);
         Route::get('/sso/mesa-de-ayuda', [AuthController::class, 'generateSsoUrl']);
-        Route::get('/wallet/dashboard-principal', [WalletController::class, 'dashboard']); 
-        // 2. DESPUÉS: El recurso genérico 
-        Route::apiResource('wallet', WalletController::class);
+      
     });
 
     // --- 3. MODULO MESA DE AYUDA ---
@@ -102,4 +112,3 @@ Route::middleware('auth:api')->group(function () {
     Route::middleware('role:GESTOR|Administrador')->group(function () {
        
     });
-});

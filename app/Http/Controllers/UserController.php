@@ -7,46 +7,31 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Spatie\Permission\Models\Role;
-use Firebase\JWT\JWT; // <--- NECESARIO PARA generateSsoUrl
-use Illuminate\Support\Facades\Auth; // Lo usaremos para el helper auth()
+use Firebase\JWT\JWT;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Tymon\JWTAuth\Facades\JWTAuth;
-use Tymon\JWTAuth\JWT as JWTAuthJWT;
 
 class UserController extends Controller
 {
-    /**
-     * Constructor para aplicar el middleware de autenticación.
-     * El middleware 'auth:api' (que ahora usa JWT) protegerá
-     * todas las rutas de este controlador, EXCEPTO 'login' y 'store'.
-     */
     public function __construct()
     {
         $this->middleware('auth:api', ['except' => ['login', 'store']]);
-        
-        // --- Middleware de Permisos de Spatie ---
-        // Descomenta y ajusta esto según tus necesidades de producción.
-        // Solo 'Administrador' puede listar, crear, ver y borrar usuarios.
-        // $this->middleware('role:Administrador', ['except' => ['login']]);
-        
-        // O, mejor aún, basado en permisos:
-        // $this->middleware('permission:gestionar usuarios', ['except' => ['login', 'logout', 'refresh', 'me']]);
     }
 
     /**
-     * Display a listing of the resource.
-     * * [MODIFICADO] Implementa la paginación de Laravel.
+     * Listado paginado con filtros.
+     * SOLUCIÓN: Cargamos 'regional' y 'costCenter' para que la tabla muestre los nombres.
      */
     public function index(Request $request)
     {
        $perPage = $request->get('per_page', 10);
         
-        // Cargamos todas las relaciones de una vez (Eager Loading)
+        // Eager Loading de todas las relaciones necesarias
         $users = User::with(['roles', 'position', 'company', 'regional', 'costCenter']) 
             ->included() 
             ->sort();
             
-        // --- LÓGICA DE FILTRADO ---
         if ($request->filled('search')) {
             $searchTerm = $request->get('search');
             $users->where(function ($query) use ($searchTerm) {
@@ -58,6 +43,10 @@ class UserController extends Controller
         
         if ($request->filled('company_id')) {
             $users->where('company_id', $request->get('company_id'));
+        }
+        
+        if ($request->filled('regional_id')) {
+            $users->where('regional_id', $request->get('regional_id'));
         }
         
         if ($request->filled('cost_center_id')) {
@@ -72,8 +61,8 @@ class UserController extends Controller
     }
 
     /**
-     * Store a newly created resource in storage.
-     * (MODIFICADO para asignar un ROL al crear)
+     * Creación de usuario.
+     * SOLUCIÓN: Retornamos el objeto cargado con relaciones para actualizar el estado del frontend.
      */
     public function store(Request $request)
     {
@@ -90,16 +79,10 @@ class UserController extends Controller
                 'nullable', 
                 'integer', 
                 Rule::exists('cost_centers', 'id')->where(function ($query) use ($request) {
-                    // El Centro de Costo (id) debe tener la Regional (regional_id)
-                    // que el usuario está enviando en el mismo request.
                     return $query->where('regional_id', $request->regional_id);
                 }),
             ],
             'password'       => 'required|min:8|max:255',
-            
-
-            // --- ¡AÑADIDO! Validación de Rol (de Spatie) ---
-            // 'role_name' es más legible que 'role_id'
             'role_name'      => 'required|string|exists:roles,name', 
         ]);
 
@@ -113,106 +96,75 @@ class UserController extends Controller
             'regional_id'    => $request->regional_id,
             'position_id'    => $request->position_id,
             'cost_center_id' => $request->cost_center_id,
-            
-            // No usamos Hash::make() porque tu modelo User.php
-            // ya tiene el 'cast' de 'password' => 'hashed'
             'password'       => Hash::make($request->password), 
         ]);
 
-        // --- ¡AÑADIDO! Asignar el rol de Spatie al usuario nuevo ---
         $user->assignRole($request->role_name);
 
-        // [MODIFICACIÓN] Retornamos el usuario con sus relaciones cargadas para el frontend
-        // para que pueda ser añadido correctamente a la lista paginada.
-        return response()->json($user->load(['roles', 'costCenter', 'company']), 201);
+        // Retornamos relaciones completas
+        return response()->json($user->load(['roles', 'costCenter', 'company', 'regional', 'position']), 201);
     }
 
     /**
-     * Display the specified resource.
-     * (Tu código está perfecto, no se toca)
+     * Ver detalles del usuario.
      */
     public function show($id)
     {
-        // Añadimos 'with' para cargar los roles y permisos del usuario
         $user = User::with(['roles', 'permissions', 'costCenter', 'company', 'regional', 'position'])->findOrFail($id);
         return response()->json($user);
     }
 
     /**
-     * Update the specified resource in storage.
-     * (MODIFICADO para actualizar el ROL)
+     * Actualización de usuario.
+     * SOLUCIÓN: Aseguramos que el regional_id se mantenga y se devuelvan todas las relaciones.
      */
-public function update(Request $request, User $user)
-{
-    $request->validate([
-        'name_user'      => 'required|string|max:255',
-        'last_name_user' => 'required|string|max:255',
-        'birthdate'      => 'nullable|date',
-        'email'          => ['required', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
-        
-        // CORRECCIÓN 1: number_document
-        // El error 422 indica que no es reconocido como string. Al quitar la regla 'string'
-        // y mantener 'max', Laravel es más flexible, aunque el campo debe ser requerido.
-        'number_document'=> ['required', 'max:255', Rule::unique('users')->ignore($user->id)],
-        
-        'company_id'     => 'required|integer|exists:companies,id',
-        'regional_id'    => 'required|integer|exists:regionals,id',
-        'position_id'    => 'required|integer|exists:positions,id',
-        'password'       => 'nullable|min:8|max:255', 
-        'cost_center_id' => [
-            'nullable', 
-            'integer', 
-            Rule::exists('cost_centers', 'id')->where(function ($query) use ($request) {
-                return $query->where('regional_id', $request->regional_id);
-            }),
-        ],
-        'role_name'      => 'required|string|exists:roles,name', 
-    ]);
+    public function update(Request $request, User $user)
+    {
+        $request->validate([
+            'name_user'      => 'required|string|max:255',
+            'last_name_user' => 'required|string|max:255',
+            'birthdate'      => 'nullable|date',
+            'email'          => ['required', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
+            'number_document'=> ['required', 'max:255', Rule::unique('users')->ignore($user->id)],
+            'company_id'     => 'required|integer|exists:companies,id',
+            'regional_id'    => 'required|integer|exists:regionals,id',
+            'position_id'    => 'required|integer|exists:positions,id',
+            'password'       => 'nullable|min:8|max:255', 
+            'cost_center_id' => [
+                'nullable', 
+                'integer', 
+                Rule::exists('cost_centers', 'id')->where(function ($query) use ($request) {
+                    return $query->where('regional_id', $request->regional_id);
+                }),
+            ],
+            'role_name'      => 'required|string|exists:roles,name', 
+        ]);
 
-    // 1. Prepara los datos a actualizar
-    $data = $request->except(['password', 'role_name']);
-
-    // 2. Si se proporciona una contraseña, hasheala e inclúyela
-    if ($request->filled('password')) {
-        $data['password'] = Hash::make($request->password);
-    }
-
-    // 3. Actualiza el usuario
-    $user->update($data);
-
-    // 4. Actualiza el rol (SOLUCIÓN al error de Spatie: RoleDoesNotExist for guard 'api')
-    $newRoleName = $request->input('role_name');
-
-    // CORRECCIÓN 2: Buscamos el rol explícitamente en el 'web' guard, 
-    // ya que tus roles se crearon sin guard, lo que hace que Spatie use 'web'.
-    // Si el rol ya existe en la DB, esta búsqueda es segura.
-    try {
-        $role = Role::findByName($newRoleName, 'api'); 
-        
-        // Sincroniza (reemplaza) todos los roles del usuario con el rol encontrado
-        if ($role) {
-            $user->syncRoles([$role]);
+        $data = $request->except(['password', 'role_name']);
+        if ($request->filled('password')) {
+            $data['password'] = Hash::make($request->password);
         }
-    } catch (\Spatie\Permission\Exceptions\RoleDoesNotExist $e) {
-        // En caso de error, devolvemos un error 422 descriptivo.
-        return response()->json(['message' => 'Error al asignar el rol: ' . $e->getMessage()], 422);
+
+        $user->update($data);
+
+        $newRoleName = $request->input('role_name');
+        try {
+            $role = Role::findByName($newRoleName, 'api'); 
+            if ($role) {
+                $user->syncRoles([$role]);
+            }
+        } catch (\Spatie\Permission\Exceptions\RoleDoesNotExist $e) {
+            return response()->json(['message' => 'Error al asignar el rol: ' . $e->getMessage()], 422);
+        }
+        
+        // Retornamos el objeto completo para que el frontend tenga el regional_id y cost_center actualizado
+        return response()->json($user->load(['roles', 'costCenter', 'company', 'regional', 'position']), 200);
     }
-    
-    // 5. Devuelve el usuario actualizado (con sus roles y costCenter)
-    // [MODIFICACIÓN] Cargamos 'costCenter' para la tabla del frontend
-    return response()->json($user->load(['roles', 'costCenter', 'company']), 200); 
-}
-    /**
-     * Remove the specified resource from storage.
-     * (Tu código está perfecto, no se toca)
-     */
+
     public function destroy($id)
     {
         $user = User::findOrFail($id);
         $user->delete();
         return response()->json(null, 204);
     }
-
-
-  
 }
