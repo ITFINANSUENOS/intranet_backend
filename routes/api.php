@@ -37,7 +37,7 @@ Route::middleware('auth:api')->group(function () {
 
     // --- 1. FUNCIONES GENERALES DE GESTIÓN (Administrador) ---
     // Protegido por el ROL de Spatie
-    Route::middleware('role:Administrador')->group(function () {
+    Route::middleware('role:Super_usuario')->group(function () {
         // El CRUD de Usuarios (excepto 'store', que es público para registro)
         Route::get('/sso/inventario', [AuthController::class, 'generateInventorySsoUrl']);
         Route::get('/sso/mesa-de-ayuda', [AuthController::class, 'generateSsoUrl']);
@@ -97,18 +97,18 @@ Route::middleware('auth:api')->group(function () {
     });
 
     // --- 2. MODULO DE INVENTARIO ---
-    Route::middleware('role:ASESOR|ADMINISTRATIVO|GESTOR|Administrador')->group(function () {
+    Route::middleware('role:Asesor|Administrativo|Gestor|Super_usuario')->group(function () {
          Route::get('/sso/inventario', [AuthController::class, 'generateInventorySsoUrl']);
         Route::get('/sso/mesa-de-ayuda', [AuthController::class, 'generateSsoUrl']);
       
     });
 
     // --- 3. MODULO MESA DE AYUDA ---
-    Route::middleware('role:ADMINSTRATIVO|GESTOR|Administrador')->group(function () {
+    Route::middleware('role:Administrativo|Gestor|Super_usuario')->group(function () {
         
     });
 
     // --- 4. MODULO DE CARTERA ---
-    Route::middleware('role:GESTOR|Administrador')->group(function () {
+    Route::middleware('role:Gestor|Super_usuario')->group(function () {
        
     });

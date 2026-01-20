@@ -54,7 +54,7 @@ class RolesAndPermissionsSeeder extends Seeder
 
         // --- ROL: ASESOR ---
         // Acceso básico: Dashboard e Inventario
-        $asesorRole = Role::firstOrCreate(['name' => 'ASESOR']);
+        $asesorRole = Role::firstOrCreate(['name' => 'Asesor']);
         $asesorRole->syncPermissions([
             'view_dashboard',
             'view_inventory',
@@ -63,7 +63,7 @@ class RolesAndPermissionsSeeder extends Seeder
 
         // --- ROL: ADMINISTRATIVO ---
         // Acceso intermedio: Dashboard, Inventario, Documentos
-        $adminiRole = Role::firstOrCreate(['name' => 'ADMINISTRATIVO']);
+        $adminiRole = Role::firstOrCreate(['name' => 'Administrativo']);
         $adminiRole->syncPermissions([
             'view_dashboard',
             'view_inventory',
@@ -73,7 +73,7 @@ class RolesAndPermissionsSeeder extends Seeder
 
         // --- ROL: GESTOR ---
         // Acceso alto: Publicación completa, Operaciones completas
-        $gestorRole = Role::firstOrCreate(['name' => 'COBRADOR']);
+        $gestorRole = Role::firstOrCreate(['name' => 'Cobrador']);
         $gestorRole->syncPermissions([
             'view_dashboard',
             // Publicación
@@ -90,7 +90,7 @@ class RolesAndPermissionsSeeder extends Seeder
 
         // --- ROL: ADMINISTRADOR ---
         // Acceso total a todo el sistema
-        $adminRole = Role::firstOrCreate(['name' => 'Administrador']);
+        $adminRole = Role::firstOrCreate(['name' => 'Super_usuario']);
         $adminRole->syncPermissions(Permission::all());
     }
 }
