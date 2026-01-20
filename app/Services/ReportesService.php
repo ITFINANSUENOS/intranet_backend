@@ -1,0 +1,53 @@
+<?php
+
+namespace App\Services;
+
+class ReportesService extends BasePythonService
+{
+    /**
+     * Obtiene el job_id del reporte activo actualmente.
+     */
+    public function getReporteActivo()
+    {
+        return $this->get('reportes/activo'); // Basado en reportes_route.py
+    }
+
+    /**
+     * Solicita una URL firmada a Python para subir un archivo.
+     */
+    public function generarUrlSubida($filename, $contentType)
+    {
+        return $this->post('reportes/generar-url-subida', [
+            'filename' => $filename,
+            'content_type' => $contentType
+        ]); //
+    }
+
+    /**
+     * Inicia el worker de procesamiento en Python.
+     */
+    public function iniciarProcesamiento($fileKey, $empresa)
+    {
+        return $this->post('reportes/iniciar-procesamiento', [
+            'file_key' => $fileKey,
+            'empresa' => $empresa
+        ]); //
+    }
+
+    /**
+     * Obtiene los JSON pre-calculados (cartera, seguimientos, novedades).
+     */
+    public function getContenidoGrafico($jobId, $modulo)
+    {
+        if (empty($jobId) || empty($modulo)) {
+            throw new \Exception("El ID del reporte y el módulo son obligatorios.");
+        }
+        
+        return $this->get("reportes/contenido/{$jobId}/{$modulo}");
+    }
+    public function buscar(array $payload)
+{
+    // Llama al endpoint de búsqueda en Python (busquedas_route.py)
+    return $this->post('busquedas/filtrar-tabla-detalle', $payload);
+}
+}

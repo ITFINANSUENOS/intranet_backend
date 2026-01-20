@@ -21,7 +21,7 @@ class RegionalSeeder extends Seeder
         $regionals = [
             [
                 'id' => 101, // El ID se maneja explícitamente en tu controlador
-                'name_regional' => 'POPAYAN',
+                'name_regional' => 'Popayan',
                 'ubication_regional' => 'Popayan Cauca',
                 'created_at' => $now,
                 'updated_at' => $now,

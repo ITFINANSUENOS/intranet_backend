@@ -7,88 +7,62 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Spatie\Permission\Models\Role;
-use Firebase\JWT\JWT; // <--- NECESARIO PARA generateSsoUrl
-use Illuminate\Support\Facades\Auth; // Lo usaremos para el helper auth()
+use Firebase\JWT\JWT;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Tymon\JWTAuth\Facades\JWTAuth;
-use Tymon\JWTAuth\JWT as JWTAuthJWT;
 
 class UserController extends Controller
 {
-    /**
-     * Constructor para aplicar el middleware de autenticación.
-     * El middleware 'auth:api' (que ahora usa JWT) protegerá
-     * todas las rutas de este controlador, EXCEPTO 'login' y 'store'.
-     */
     public function __construct()
     {
         $this->middleware('auth:api', ['except' => ['login', 'store']]);
-        
-        // --- Middleware de Permisos de Spatie ---
-        // Descomenta y ajusta esto según tus necesidades de producción.
-        // Solo 'Administrador' puede listar, crear, ver y borrar usuarios.
-        // $this->middleware('role:Administrador', ['except' => ['login']]);
-        
-        // O, mejor aún, basado en permisos:
-        // $this->middleware('permission:gestionar usuarios', ['except' => ['login', 'logout', 'refresh', 'me']]);
     }
 
     /**
-     * Display a listing of the resource.
-     * * [MODIFICADO] Implementa la paginación de Laravel.
+     * Listado paginado con filtros.
+     * SOLUCIÓN: Cargamos 'regional' y 'costCenter' para que la tabla muestre los nombres.
      */
     public function index(Request $request)
     {
-        // El frontend pide per_page=10, lo usamos por defecto
-        $perPage = $request->get('per_page', 10);
+       $perPage = $request->get('per_page', 10);
         
-        $users = User::with(['roles', 'position', 'company']) // Incluimos 'costCenter' para la tabla
+        // Eager Loading de todas las relaciones necesarias
+        $users = User::with(['roles', 'position', 'company', 'regional', 'costCenter']) 
             ->included() 
-            // ->filter() // **IMPORTANTE: Si no tienes el scopeFilter() en el modelo, elimínalo o coméntalo.**
             ->sort();
             
-        // =============================================
-        // LÓGICA DE BÚSQUEDA Y FILTRADO (SOLUCIÓN)
-        // =============================================
-
-        // 1. Filtro por Nombre/Apellido (Search)
         if ($request->filled('search')) {
             $searchTerm = $request->get('search');
             $users->where(function ($query) use ($searchTerm) {
-                // Busca en name_user O last_name_user
                 $query->where('name_user', 'like', '%' . $searchTerm . '%')
-                      ->orWhere('last_name_user', 'like', '%' . $searchTerm . '%');
+                      ->orWhere('last_name_user', 'like', '%' . $searchTerm . '%')
+                      ->orWhere('email', 'like', '%' . $searchTerm . '%');
             });
         }
         
-        // 2. Filtro por Empresa
         if ($request->filled('company_id')) {
             $users->where('company_id', $request->get('company_id'));
         }
         
-        // 3. Filtro por Centro de Costo
+        if ($request->filled('regional_id')) {
+            $users->where('regional_id', $request->get('regional_id'));
+        }
+        
         if ($request->filled('cost_center_id')) {
             $users->where('cost_center_id', $request->get('cost_center_id'));
         }
         
-        // 4. Filtro por Posición
         if ($request->filled('position_id')) {
             $users->where('position_id', $request->get('position_id'));
         }
-
-        // =============================================
-        // FIN LÓGICA DE BÚSQUEDA Y FILTRADO
-        // =============================================
             
-        // Paginación final después de aplicar los filtros
-        $users = $users->paginate($perPage); 
-
-        return response()->json($users);
+        return response()->json($users->paginate($perPage));
     }
 
     /**
-     * Store a newly created resource in storage.
-     * (MODIFICADO para asignar un ROL al crear)
+     * Creación de usuario.
+     * SOLUCIÓN: Retornamos el objeto cargado con relaciones para actualizar el estado del frontend.
      */
     public function store(Request $request)
     {
@@ -105,16 +79,10 @@ class UserController extends Controller
                 'nullable', 
                 'integer', 
                 Rule::exists('cost_centers', 'id')->where(function ($query) use ($request) {
-                    // El Centro de Costo (id) debe tener la Regional (regional_id)
-                    // que el usuario está enviando en el mismo request.
                     return $query->where('regional_id', $request->regional_id);
                 }),
             ],
             'password'       => 'required|min:8|max:255',
-            
-
-            // --- ¡AÑADIDO! Validación de Rol (de Spatie) ---
-            // 'role_name' es más legible que 'role_id'
             'role_name'      => 'required|string|exists:roles,name', 
         ]);
 
@@ -128,280 +96,75 @@ class UserController extends Controller
             'regional_id'    => $request->regional_id,
             'position_id'    => $request->position_id,
             'cost_center_id' => $request->cost_center_id,
-            
-            // No usamos Hash::make() porque tu modelo User.php
-            // ya tiene el 'cast' de 'password' => 'hashed'
             'password'       => Hash::make($request->password), 
         ]);
 
-        // --- ¡AÑADIDO! Asignar el rol de Spatie al usuario nuevo ---
         $user->assignRole($request->role_name);
 
-        // [MODIFICACIÓN] Retornamos el usuario con sus relaciones cargadas para el frontend
-        // para que pueda ser añadido correctamente a la lista paginada.
-        return response()->json($user->load(['roles', 'costCenter', 'company']), 201);
+        // Retornamos relaciones completas
+        return response()->json($user->load(['roles', 'costCenter', 'company', 'regional', 'position']), 201);
     }
 
     /**
-     * Display the specified resource.
-     * (Tu código está perfecto, no se toca)
+     * Ver detalles del usuario.
      */
     public function show($id)
     {
-        // Añadimos 'with' para cargar los roles y permisos del usuario
         $user = User::with(['roles', 'permissions', 'costCenter', 'company', 'regional', 'position'])->findOrFail($id);
         return response()->json($user);
     }
 
     /**
-     * Update the specified resource in storage.
-     * (MODIFICADO para actualizar el ROL)
+     * Actualización de usuario.
+     * SOLUCIÓN: Aseguramos que el regional_id se mantenga y se devuelvan todas las relaciones.
      */
-public function update(Request $request, User $user)
-{
-    $request->validate([
-        'name_user'      => 'required|string|max:255',
-        'last_name_user' => 'required|string|max:255',
-        'birthdate'      => 'nullable|date',
-        'email'          => ['required', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
-        
-        // CORRECCIÓN 1: number_document
-        // El error 422 indica que no es reconocido como string. Al quitar la regla 'string'
-        // y mantener 'max', Laravel es más flexible, aunque el campo debe ser requerido.
-        'number_document'=> ['required', 'max:255', Rule::unique('users')->ignore($user->id)],
-        
-        'company_id'     => 'required|integer|exists:companies,id',
-        'regional_id'    => 'required|integer|exists:regionals,id',
-        'position_id'    => 'required|integer|exists:positions,id',
-        'password'       => 'nullable|min:8|max:255', 
-        'cost_center_id' => [
-            'nullable', 
-            'integer', 
-            Rule::exists('cost_centers', 'id')->where(function ($query) use ($request) {
-                return $query->where('regional_id', $request->regional_id);
-            }),
-        ],
-        'role_name'      => 'required|string|exists:roles,name', 
-    ]);
+    public function update(Request $request, User $user)
+    {
+        $request->validate([
+            'name_user'      => 'required|string|max:255',
+            'last_name_user' => 'required|string|max:255',
+            'birthdate'      => 'nullable|date',
+            'email'          => ['required', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
+            'number_document'=> ['required', 'max:255', Rule::unique('users')->ignore($user->id)],
+            'company_id'     => 'required|integer|exists:companies,id',
+            'regional_id'    => 'required|integer|exists:regionals,id',
+            'position_id'    => 'required|integer|exists:positions,id',
+            'password'       => 'nullable|min:8|max:255', 
+            'cost_center_id' => [
+                'nullable', 
+                'integer', 
+                Rule::exists('cost_centers', 'id')->where(function ($query) use ($request) {
+                    return $query->where('regional_id', $request->regional_id);
+                }),
+            ],
+            'role_name'      => 'required|string|exists:roles,name', 
+        ]);
 
-    // 1. Prepara los datos a actualizar
-    $data = $request->except(['password', 'role_name']);
-
-    // 2. Si se proporciona una contraseña, hasheala e inclúyela
-    if ($request->filled('password')) {
-        $data['password'] = Hash::make($request->password);
-    }
-
-    // 3. Actualiza el usuario
-    $user->update($data);
-
-    // 4. Actualiza el rol (SOLUCIÓN al error de Spatie: RoleDoesNotExist for guard 'api')
-    $newRoleName = $request->input('role_name');
-
-    // CORRECCIÓN 2: Buscamos el rol explícitamente en el 'web' guard, 
-    // ya que tus roles se crearon sin guard, lo que hace que Spatie use 'web'.
-    // Si el rol ya existe en la DB, esta búsqueda es segura.
-    try {
-        $role = Role::findByName($newRoleName, 'web'); 
-        
-        // Sincroniza (reemplaza) todos los roles del usuario con el rol encontrado
-        if ($role) {
-            $user->syncRoles([$role]);
+        $data = $request->except(['password', 'role_name']);
+        if ($request->filled('password')) {
+            $data['password'] = Hash::make($request->password);
         }
-    } catch (\Spatie\Permission\Exceptions\RoleDoesNotExist $e) {
-        // En caso de error, devolvemos un error 422 descriptivo.
-        return response()->json(['message' => 'Error al asignar el rol: ' . $e->getMessage()], 422);
+
+        $user->update($data);
+
+        $newRoleName = $request->input('role_name');
+        try {
+            $role = Role::findByName($newRoleName, 'web'); 
+            if ($role) {
+                $user->syncRoles([$role]);
+            }
+        } catch (\Spatie\Permission\Exceptions\RoleDoesNotExist $e) {
+            return response()->json(['message' => 'Error al asignar el rol: ' . $e->getMessage()], 422);
+        }
+        
+        // Retornamos el objeto completo para que el frontend tenga el regional_id y cost_center actualizado
+        return response()->json($user->load(['roles', 'costCenter', 'company', 'regional', 'position']), 200);
     }
-    
-    // 5. Devuelve el usuario actualizado (con sus roles y costCenter)
-    // [MODIFICACIÓN] Cargamos 'costCenter' para la tabla del frontend
-    return response()->json($user->load(['roles', 'costCenter', 'company']), 200); 
-}
-    /**
-     * Remove the specified resource from storage.
-     * (Tu código está perfecto, no se toca)
-     */
+
     public function destroy($id)
     {
         $user = User::findOrFail($id);
         $user->delete();
         return response()->json(null, 204);
-    }
-
-
-   //Funciones de Autenticación con JWT y Spatie
-    /**
-     * Autentica un usuario y devuelve un token JWT.
-     */
-    public function login(Request $request)
-    {
-        $credentials = $request->validate([
-            'email' => 'required|email',
-            'password' => 'required',
-        ]);
-
-        // 1. Intentar autenticar y crear el token JWT
-        // Usamos el guardia 'api' que configuramos para usar 'jwt'
-        if (! $token = auth('api')->attempt($credentials)) {
-            // Error de autenticación
-            return response()->json(['error' => 'Credenciales inválidas'], 401);
-        }
-
-        // 2. Si el token se crea, llamamos a nuestra función de respuesta
-        return $this->respondWithToken($token);
-    }
-
-    /**
-     * Cierra la sesión del usuario (Invalida el token JWT).
-     * (REEMPLAZA tu función de logout de Sanctum)
-     */
-    public function logout()
-    {
-        auth('api')->logout(); // Invalida el token JWT
-        return response()->json(['message' => 'Sesión cerrada exitosamente']);
-    }
-
-    /**
-     * Obtiene los datos del usuario autenticado actualmente.
-     * (Ruta 'me' muy útil para el frontend)
-     */
-    public function me()
-    {
-        // auth('api')->user() te da el modelo User
-        // pero lo formateamos para incluir roles/permisos
-        $user = auth('api')->user(); 
-        
-        return response()->json([
-            'id' => $user->id,
-            'name' => $user->name_user,
-            'email' => $user->email,
-            'roles' => $user->getRoleNames(), // Método de Spatie
-            'permissions' => $user->getAllPermissions()->pluck('name'), // Método de Spatie
-        ]);
-    }
-
-    /**
-     * Refresca un token JWT.
-     */
-    public function refresh()
-    {
-        return $this->respondWithToken(auth('api')->refresh());
-    }
-
-    /**
-     * Función helper para formatear la respuesta del token.
-     * Aquí es donde unimos JWT y SPATIE.
-     */    // --- ========================================== ---
-    protected function respondWithToken($token)
-    {
-        // Obtiene el usuario autenticado
-        $user = auth('api')->user();
-
-        // Obtiene los roles y permisos (¡Gracias a Spatie!)
-        $roles = $user->getRoleNames();
-        $permissions = $user->getAllPermissions()->pluck('name');
-
-        return response()->json([
-            'access_token' => $token,
-            'token_type'   => 'bearer',
-            // [MODIFICACIÓN] Usamos la factoría directamente en lugar de un posible método
-            // paginador si se modificara el helper auth() en el futuro.
-            'expires_in'   => auth('api')->factory()->getTTL() * 60, // Expiración en segundos
-            
-            // Adjuntamos la información del usuario para el frontend
-            'user' => [
-                'id'          => $user->id,
-                'name'        => $user->name_user,
-                'email'       => $user->email,
-                'roles'       => $roles,
-                'permissions' => $permissions,
-            ]
-        ]);
-    }
-
-   public function generateSsoUrl()
-    {
-        $user = Auth::guard('api')->user(); // Obtiene el usuario autenticado por JWT
-
-        if (!$user) {
-             // Esto solo debería ocurrir si el middleware falló por alguna razón
-             return response()->json(['message' => 'Usuario no autenticado para SSO'], 401);
-        }
-
-        // 1. Configuración de la clave secreta y reclamos
-        $secretKey = env('JWT_SECRET', 'TU-CLAVE-SECRETA-SSO-MUY-LARGA'); 
-        $issuerClaim = config('app.url'); 
-        $audienceClaim = "electrocreditosdelcauca.com";
-        $issuedAtClaim = time();
-        $expireClaim = $issuedAtClaim + 3600; // 1 hora
-
-        // 2. Definición de la Carga Útil (Payload)
-        $payload = [
-            'iss' => $issuerClaim,
-            'aud' => $audienceClaim,
-            'iat' => $issuedAtClaim,
-            'exp' => $expireClaim,
-            'data' => [
-                'id' => $user->id,
-                'email' => $user->email,
-                // **Asegúrate que 'number_document' es el campo correcto para la cédula**
-                'cedula' => $user->number_document 
-            ]
-        ];
-
-        // 3. Codificación del Token SSO
-        // Esto requiere que 'firebase/php-jwt' esté instalado
-        $ssoToken = JWT::encode($payload, $secretKey, 'HS256');
-
-        // 4. Construcción de la URL de destino
-        $baseUrl = 'http://helpdesk.electrocreditosdelcauca.com/sso-login.php';
-        $ssoUrl = $baseUrl . '?token=' . urlencode($ssoToken);
-
-        // 5. Devolver la URL al frontend
-        return response()->json([
-            'sso_url' => $ssoUrl
-        ]);
-    }
-    public function generateInventorySsoUrl()
-    {
-        // 1. Obtiene el usuario autenticado
-        $user = Auth::guard('api')->user(); // Obtiene el usuario autenticado por JWT
-
-        if (!$user) {
-             // Si no hay usuario autenticado (lo que no debería pasar si el middleware funciona)
-             return response()->json(['message' => 'Usuario no autenticado para SSO de Inventario'], 401);
-        }
-
-        // 2. Configuración (puedes ajustar estos valores si son diferentes para el sistema de inventario)
-        // Se recomienda usar una clave secreta *diferente* si el sistema lo soporta, 
-        // pero por simplicidad, usaremos la misma por defecto.
-        $secretKey = env('JWT_SECRET', env('JWT_SECRET', 'TU-CLAVE-SECRETA-SSO-MUY-LARGA')); 
-        $issuedAtClaim = time();
-        $expireClaim = $issuedAtClaim + 300; // Token de corta duración: 5 minutos (ajustable)
-
-        // 3. Definición de la Carga Útil (Payload)
-        // Solo necesitamos la cédula para este sistema
-        $payload = [
-            'iat' => $issuedAtClaim,
-            'exp' => $expireClaim,
-            'data' => [
-                // **Este es el campo requerido por el sistema de Inventario**
-                'cedula' => $user->number_document 
-            ]
-        ];
-
-        // 4. Codificación del Token SSO
-        // Requiere la librería 'firebase/php-jwt'
-        $ssoToken = JWT::encode($payload, $secretKey, 'HS256');
-
-        // 5. Construcción de la URL de destino del sistema de Inventario
-        // **IMPORTANTE: Debes cambiar esta URL por la URL real de tu sistema de Inventario**
-        $baseUrl = 'https://activosfijos.electrocreditosdelcauca.com/sso_login.php'; 
-        $ssoUrl = $baseUrl . '?token=' . urlencode($ssoToken);
-
-        // 6. Devolver la URL al frontend
-        return response()->json([
-            'sso_url' => $ssoUrl
-        ]);
     }
 }
