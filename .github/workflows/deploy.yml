@@ -1,0 +1,33 @@
+name: Deploy Backend to EC2
+on:
+  push:
+    branches:
+      - master
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /var/www/html
+            # 1. Obtener cambios
+            sudo git pull origin master
+            # 2. Instalar dependencias (optimizado)
+            # sudo composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+            # 3. Correr migraciones (¡Cuidado! Descomenta si lo necesitas)
+            # sudo php artisan migrate --force
+            # 4. Limpiar y recachear configuración
+            sudo php artisan config:clear
+            sudo php artisan cache:clear
+            sudo php artisan route:cache
+            sudo php artisan view:cache
+            sudo php artisan config:cache
+            # 5. Permisos (Asegurar que www-data siga siendo el dueño)
+            sudo chown -R www-data:www-data /var/www/html
