@@ -53,7 +53,7 @@ class User extends Authenticatable implements JWTSubject
             'password' => 'hashed', 
         ];
     }
-    protected $guard_name = 'web'; // Fuerza a que siempre busque roles en el guard de la API
+    protected $guard_name = 'api'; // Fuerza a que siempre busque roles en el guard de la API
     // Listas para filtros dinámicos (ajustadas a tus relaciones)
     protected $allowIncluded = ['company', 'regional', 'position', 'roles', 'costCenter']; 
     protected $allowFilter = ['id', 'email']; 

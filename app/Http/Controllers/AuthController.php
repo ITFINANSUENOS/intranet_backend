@@ -2,31 +2,32 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Http\Requests\LoginRequest; // [Punto 4]
+use App\Services\SsoService;       // [Punto 2]
 use Illuminate\Support\Facades\Auth;
-use Firebase\JWT\JWT;
-use App\Models\User;
+use Exception;
 
 class AuthController extends Controller
 {
+    protected $ssoService;
+
     /**
-     * Constructor para aplicar middleware.
+     * Inyección de dependencias para la lógica de negocio [Punto 2]
      */
-    public function __construct()
+    public function __construct(SsoService $ssoService)
     {
-        // Solo login es público
         $this->middleware('auth:api', ['except' => ['login']]);
+        $this->ssoService = $ssoService;
     }
 
     /**
-     * Autentica un usuario y devuelve un token JWT.
+     * Login usando FormRequest para validación [Punto 4].
      */
-    public function login(Request $request)
+    public function login(LoginRequest $request)
     {
-        $credentials = $request->validate([
-            'email' => 'required|email',
-            'password' => 'required',
-        ]);
+        // La validación ya pasó automáticamente al inyectar LoginRequest.
+        // Obtenemos solo los datos validados y seguros.
+        $credentials = $request->only(['email', 'password']);
 
         if (!$token = auth('api')->attempt($credentials)) {
             return response()->json(['error' => 'Credenciales inválidas'], 401);
@@ -34,7 +35,6 @@ class AuthController extends Controller
 
         return $this->respondWithToken($token);
     }
-
     /**
      * Obtiene los datos del usuario autenticado.
      */
@@ -70,99 +70,61 @@ class AuthController extends Controller
     /**
      * SSO para Mesa de Ayuda
      */
-   public function generateSsoUrl()
+   /**
+     * SSO para Mesa de Ayuda
+     * Refactorizado para usar el servicio y evitar duplicación [Punto 3]
+     */
+    public function generateSsoUrl()
     {
-        $user = Auth::guard('api')->user(); // Obtiene el usuario autenticado por JWT
-
-        if (!$user) {
-             // Esto solo debería ocurrir si el middleware falló por alguna razón
-             return response()->json(['message' => 'Usuario no autenticado para SSO'], 401);
-        }
-
-        // 1. Configuración de la clave secreta y reclamos
-        $secretKey = env('JWT_SECRET', 'TU-CLAVE-SECRETA-SSO-MUY-LARGA'); 
-        $issuerClaim = config('app.url'); 
-        $audienceClaim = "electrocreditosdelcauca.com";
-        $issuedAtClaim = time();
-        $expireClaim = $issuedAtClaim + 3600; // 1 hora
-
-        // 2. Definición de la Carga Útil (Payload)
-        $payload = [
-            'iss' => $issuerClaim,
-            'aud' => $audienceClaim,
-            'iat' => $issuedAtClaim,
-            'exp' => $expireClaim,
-            'data' => [
-                'id' => $user->id,
-                'email' => $user->email,
-                // **Asegúrate que 'number_document' es el campo correcto para la cédula**
-                'cedula' => $user->number_document 
-            ]
-        ];
-
-        // 3. Codificación del Token SSO
-        // Esto requiere que 'firebase/php-jwt' esté instalado
-        $ssoToken = JWT::encode($payload, $secretKey, 'HS256');
-
-        // 4. Construcción de la URL de destino
-        $baseUrl = 'http://helpdesk.electrocreditosdelcauca.com/sso-login.php';
-        $ssoUrl = $baseUrl . '?token=' . urlencode($ssoToken);
-
-        // 5. Devolver la URL al frontend
-        return response()->json([
-            'sso_url' => $ssoUrl
-        ]);
+        return $this->handleSsoGeneration(
+            'http://helpdesk.electrocreditosdelcauca.com/sso-login.php',
+            3600 // 1 hora
+        );
     }
 
     /**
      * SSO para Inventario
+     * Reutiliza la misma lógica a través del método privado auxiliar [Punto 3]
      */
     public function generateInventorySsoUrl()
     {
-        // 1. Obtiene el usuario autenticado
-        $user = Auth::guard('api')->user(); // Obtiene el usuario autenticado por JWT
-
-        if (!$user) {
-             // Si no hay usuario autenticado (lo que no debería pasar si el middleware funciona)
-             return response()->json(['message' => 'Usuario no autenticado para SSO de Inventario'], 401);
-        }
-
-        // 2. Configuración (puedes ajustar estos valores si son diferentes para el sistema de inventario)
-        // Se recomienda usar una clave secreta *diferente* si el sistema lo soporta, 
-        // pero por simplicidad, usaremos la misma por defecto.
-        $secretKey = env('JWT_SECRET', env('JWT_SECRET', 'TU-CLAVE-SECRETA-SSO-MUY-LARGA')); 
-        $issuedAtClaim = time();
-        $expireClaim = $issuedAtClaim + 300; // Token de corta duración: 5 minutos (ajustable)
-
-        // 3. Definición de la Carga Útil (Payload)
-        // Solo necesitamos la cédula para este sistema
-        $payload = [
-            'iat' => $issuedAtClaim,
-            'exp' => $expireClaim,
-            'data' => [
-                // **Este es el campo requerido por el sistema de Inventario**
-                'cedula' => $user->number_document 
-            ]
-        ];
-
-        // 4. Codificación del Token SSO
-        // Requiere la librería 'firebase/php-jwt'
-        $ssoToken = JWT::encode($payload, $secretKey, 'HS256');
-
-        // 5. Construcción de la URL de destino del sistema de Inventario
-        // **IMPORTANTE: Debes cambiar esta URL por la URL real de tu sistema de Inventario**
-        $baseUrl = 'https://activosfijos.electrocreditosdelcauca.com/sso_login.php'; 
-        $ssoUrl = $baseUrl . '?token=' . urlencode($ssoToken);
-
-        // 6. Devolver la URL al frontend
-        return response()->json([
-            'sso_url' => $ssoUrl
-        ]);
+        return $this->handleSsoGeneration(
+            'https://activosfijos.electrocreditosdelcauca.com/sso_login.php',
+            300 // 5 minutos
+        );
     }
 
     /**
-     * Estructura la respuesta del token.
+     * Método auxiliar privado para orquestar la llamada al servicio.
+     * Esto limpia los métodos públicos y centraliza el manejo de respuestas HTTP.
      */
+    private function handleSsoGeneration(string $url, int $expiry)
+    {
+        $user = Auth::guard('api')->user();
+
+        if (!$user) {
+             return response()->json(['message' => 'Usuario no autenticado'], 401);
+        }
+
+        try {
+            // [Punto 2 y 3] Delegamos la lógica compleja al servicio
+            // Pasamos solo los datos variables (URL, claims específicos, tiempo)
+            $ssoUrl = $this->ssoService->generateSsoLink(
+                $user, 
+                $url, 
+                ['cedula' => $user->number_document], // Claim personalizado
+                $expiry
+            );
+
+            return response()->json(['sso_url' => $ssoUrl]);
+
+        } catch (Exception $e) {
+            // [Punto 5] Capturamos la excepción del servicio y devolvemos un error 500 controlado
+            // No le mostramos el error real al usuario, pero ya fue guardado en el Log por el servicio.
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
     protected function respondWithToken($token)
     {
         $user = auth('api')->user();
