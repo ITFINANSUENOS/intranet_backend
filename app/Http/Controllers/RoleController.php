@@ -37,7 +37,7 @@ use Illuminate\Validation\Rule;
         // 1. Crear el rol
         $role = Role::create([
             'name' => $request->name, 
-            'guard_name' => 'web' // <-- ¡SOLUCIÓN!
+            'guard_name' => 'api' // <-- ¡SOLUCIÓN!
         ]);
 
         // 2. Asignar permisos si se enviaron

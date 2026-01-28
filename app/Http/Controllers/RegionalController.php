@@ -26,7 +26,7 @@ class RegionalController extends Controller
     {
         //validacion de campos de la tabla
         $request->validate([
-            'id'=> 'required|unique_regionals,id',
+            'id'=> 'required|unique:regionals,id',
             'name_regional' => 'required|max:255',
             'ubication_regional'  => 'required|max:255',
         ]);

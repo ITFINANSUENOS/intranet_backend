@@ -149,7 +149,7 @@ class UserController extends Controller
 
         $newRoleName = $request->input('role_name');
         try {
-            $role = Role::findByName($newRoleName, 'web'); 
+            $role = Role::findByName($newRoleName, 'api'); 
             if ($role) {
                 $user->syncRoles([$role]);
             }

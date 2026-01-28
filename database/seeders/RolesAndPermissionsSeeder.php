@@ -43,18 +43,19 @@ class RolesAndPermissionsSeeder extends Seeder
             // --- Soporte (Opcional si quieres restringirlo también) ---
             'view_help_desk',
             'view_api_docs',
+            'general_report',
         ];
 
         // Crear permisos en bucle
         foreach ($permissions as $permission) {
-            Permission::firstOrCreate(['name' => $permission]);
+            Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'api']);
         }
 
         // 3. CREAR ROLES Y ASIGNAR PERMISOS INICIALES
 
         // --- ROL: ASESOR ---
         // Acceso básico: Dashboard e Inventario
-        $asesorRole = Role::firstOrCreate(['name' => 'Asesor']);
+        $asesorRole = Role::firstOrCreate(['name' => 'Asesor', 'guard_name' => 'api']);
         $asesorRole->syncPermissions([
             'view_dashboard',
             'view_inventory',
@@ -63,7 +64,7 @@ class RolesAndPermissionsSeeder extends Seeder
 
         // --- ROL: ADMINISTRATIVO ---
         // Acceso intermedio: Dashboard, Inventario, Documentos
-        $adminiRole = Role::firstOrCreate(['name' => 'Administrativo']);
+        $adminiRole = Role::firstOrCreate(['name' => 'Administrativo', 'guard_name' => 'api']);
         $adminiRole->syncPermissions([
             'view_dashboard',
             'view_inventory',
@@ -73,7 +74,7 @@ class RolesAndPermissionsSeeder extends Seeder
 
         // --- ROL: GESTOR ---
         // Acceso alto: Publicación completa, Operaciones completas
-        $gestorRole = Role::firstOrCreate(['name' => 'Cobrador']);
+        $gestorRole = Role::firstOrCreate(['name' => 'Cobrador', 'guard_name' => 'api']);
         $gestorRole->syncPermissions([
             'view_dashboard',
             // Publicación
@@ -90,7 +91,7 @@ class RolesAndPermissionsSeeder extends Seeder
 
         // --- ROL: ADMINISTRADOR ---
         // Acceso total a todo el sistema
-        $adminRole = Role::firstOrCreate(['name' => 'Super_usuario']);
+        $adminRole = Role::firstOrCreate(['name' => 'Super_usuario', 'guard_name' => 'api']);
         $adminRole->syncPermissions(Permission::all());
     }
 }

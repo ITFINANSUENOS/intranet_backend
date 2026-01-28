@@ -340,7 +340,7 @@ class UserSeeder extends Seeder
             // Creamos el rol si no existe (seguridad) y se lo asignamos
             // Nota: Se asume que los roles ya existen gracias a RolesAndPermissionsSeeder,
             // pero firstOrCreate evita errores si se ejecuta este seeder solo.
-            $role = Role::firstOrCreate(['name' => $roleName, 'guard_name' => 'web']);
+            $role = Role::firstOrCreate(['name' => $roleName, 'guard_name' => 'api']);
             
             if (!$user->hasRole($roleName)) {
                 $user->assignRole($role);
