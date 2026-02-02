@@ -15,12 +15,13 @@ class ReportesService extends BasePythonService
     /**
      * Solicita una URL firmada a Python para subir un archivo.
      */
-    public function generarUrlSubida($filename, $contentType)
+    public function generarUrlSubida($filename, $contentType, $fileSize)
     {
         return $this->post('reportes/generar-url-subida', [
             'filename' => $filename,
-            'content_type' => $contentType
-        ]); //
+            'content_type' => $contentType,
+            'file_size' => $fileSize 
+        ]); 
     }
 
     /**
@@ -31,7 +32,7 @@ class ReportesService extends BasePythonService
         return $this->post('reportes/iniciar-procesamiento', [
             'file_key' => $fileKey,
             'empresa' => $empresa
-        ]); //
+        ]); 
     }
 
     /**

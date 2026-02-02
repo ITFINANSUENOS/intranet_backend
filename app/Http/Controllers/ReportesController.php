@@ -20,12 +20,19 @@ class ReportesController extends Controller
      */
     public function generarUrlSubida(Request $request)
     {
+        // [MODIFICADO] Validamos que llegue el file_size
         $request->validate([
             'filename' => 'required|string',
-            'content_type' => 'required|string'
+            'content_type' => 'required|string',
+            'file_size' => 'required|integer' 
         ]);
 
-        $res = $this->service->generarUrlSubida($request->filename, $request->content_type);
+        // [MODIFICADO] Pasamos el file_size al servicio
+        $res = $this->service->generarUrlSubida(
+            $request->filename, 
+            $request->content_type,
+            $request->file_size
+        );
         return response()->json($res);
     }
 
@@ -33,7 +40,7 @@ class ReportesController extends Controller
      * PASO 2: Una vez el archivo está en S3, este método le avisa a Python
      * que debe comenzar a procesarlo (Worker).
      */
-   public function iniciarProcesamiento(Request $request)
+  public function iniciarProcesamiento(Request $request)
     {
         $request->validate([
             'file_key' => 'required|string',
