@@ -2,18 +2,17 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\LoginRequest; // [Punto 4]
-use App\Services\SsoService;       // [Punto 2]
+use App\Http\Requests\LoginRequest;
+use App\Services\SsoService;
+use App\Models\User; // <--- AGREGADO
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash; // <--- AGREGADO
 use Exception;
 
 class AuthController extends Controller
 {
     protected $ssoService;
 
-    /**
-     * Inyección de dependencias para la lógica de negocio [Punto 2]
-     */
     public function __construct(SsoService $ssoService)
     {
         $this->middleware('auth:api', ['except' => ['login']]);
@@ -21,23 +20,40 @@ class AuthController extends Controller
     }
 
     /**
-     * Login usando FormRequest para validación [Punto 4].
+     * Login con validación granular de errores.
      */
     public function login(LoginRequest $request)
     {
-        // La validación ya pasó automáticamente al inyectar LoginRequest.
-        // Obtenemos solo los datos validados y seguros.
+        // 1. Obtenemos credenciales validadas
         $credentials = $request->only(['email', 'password']);
 
-        if (!$token = auth('api')->attempt($credentials)) {
-            return response()->json(['error' => 'Credenciales inválidas'], 401);
+        // 2. Buscamos al usuario manualmente para verificar si el EMAIL existe
+        $user = User::where('email', $credentials['email'])->first();
+
+        // CASO 1: El correo no existe en la base de datos
+        if (!$user) {
+            return response()->json([
+                'error' => 'El correo electrónico no está registrado.',
+                'code'  => 'EMAIL_NOT_FOUND'
+            ], 404); // Usamos 404 para indicar que no se encontró
+        }
+
+        // CASO 2: El correo existe, validamos la contraseña
+        if (!Hash::check($credentials['password'], $user->password)) {
+            return response()->json([
+                'error' => 'La contraseña es incorrecta.',
+                'code'  => 'INVALID_PASSWORD'
+            ], 401); // Usamos 401 para error de autenticación
+        }
+
+        // 3. Si pasa manual, generamos el token con JWT (attempt genera el token)
+        if (!$token = auth('api')->login($user)) {
+            return response()->json(['error' => 'Error al generar el token'], 500);
         }
 
         return $this->respondWithToken($token);
     }
-    /**
-     * Obtiene los datos del usuario autenticado.
-     */
+
     public function me()
     {
         $user = auth('api')->user();
@@ -50,54 +66,33 @@ class AuthController extends Controller
         ]);
     }
 
-    /**
-     * Cierra la sesión (Invalida el token).
-     */
     public function logout()
     {
         auth('api')->logout();
         return response()->json(['message' => 'Sesión cerrada exitosamente']);
     }
 
-    /**
-     * Refresca el token actual.
-     */
     public function refresh()
     {
         return $this->respondWithToken(auth('api')->refresh());
     }
 
-    /**
-     * SSO para Mesa de Ayuda
-     */
-   /**
-     * SSO para Mesa de Ayuda
-     * Refactorizado para usar el servicio y evitar duplicación [Punto 3]
-     */
     public function generateSsoUrl()
     {
         return $this->handleSsoGeneration(
             'http://helpdesk.electrocreditosdelcauca.com/sso-login.php',
-            3600 // 1 hora
+            3600
         );
     }
 
-    /**
-     * SSO para Inventario
-     * Reutiliza la misma lógica a través del método privado auxiliar [Punto 3]
-     */
     public function generateInventorySsoUrl()
     {
         return $this->handleSsoGeneration(
             'https://activosfijos.electrocreditosdelcauca.com/sso_login.php',
-            300 // 5 minutos
+            300
         );
     }
 
-    /**
-     * Método auxiliar privado para orquestar la llamada al servicio.
-     * Esto limpia los métodos públicos y centraliza el manejo de respuestas HTTP.
-     */
     private function handleSsoGeneration(string $url, int $expiry)
     {
         $user = Auth::guard('api')->user();
@@ -107,20 +102,14 @@ class AuthController extends Controller
         }
 
         try {
-            // [Punto 2 y 3] Delegamos la lógica compleja al servicio
-            // Pasamos solo los datos variables (URL, claims específicos, tiempo)
             $ssoUrl = $this->ssoService->generateSsoLink(
                 $user, 
                 $url, 
-                ['cedula' => $user->number_document], // Claim personalizado
+                ['cedula' => $user->number_document], 
                 $expiry
             );
-
             return response()->json(['sso_url' => $ssoUrl]);
-
         } catch (Exception $e) {
-            // [Punto 5] Capturamos la excepción del servicio y devolvemos un error 500 controlado
-            // No le mostramos el error real al usuario, pero ya fue guardado en el Log por el servicio.
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
