@@ -30,7 +30,7 @@ class PermissionController extends Controller
 
         $permission = Permission::create([
             'name' => $request->name,
-            'guard_name' => 'web' // <-- ¡SOLUCIÓN!
+            'guard_name' => 'api' // <-- ¡SOLUCIÓN!
         ]);
 
         return response()->json($permission, 201);

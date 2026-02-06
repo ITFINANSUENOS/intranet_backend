@@ -16,21 +16,29 @@ class WalletController extends Controller
         $this->reportesService = $reportes;
     }
 
-    public function initDashboard($modulo)
+    public function initDashboard(Request $request, $modulo)
     {
         try {
-            $activo = $this->reportesService->getReporteActivo(); 
-            $jobId = $activo['active_job_id'] ?? $activo['job_id'] ?? null;
+            // 2. CORRECCIÓN: Primero intentamos tomar el ID que envía el frontend
+            $jobId = $request->input('job_id');
+
+            // Solo si el frontend NO envió nada, buscamos el activo en base de datos (fallback)
+            $activo = null;
+            if (!$jobId) {
+                $activo = $this->reportesService->getReporteActivo(); 
+                $jobId = $activo['active_job_id'] ?? $activo['job_id'] ?? null;
+            }
 
             if (!$jobId) {
                 return response()->json(['error' => 'No hay reportes procesados.'], 404);
             }
 
+            // 3. Obtenemos los gráficos usando el ID (sea el del request o el activo)
             $graficos = $this->reportesService->getContenidoGrafico($jobId, $modulo); 
             
             return response()->json([
                 'job_id' => $jobId,
-                'empresa' => $activo['empresa'] ?? 'N/A',
+                'empresa' => $activo['empresa'] ?? 'N/A', // Nota: Si viene del request, 'empresa' podría ser null aquí, pero no rompe el código
                 'data' => $graficos
             ]);
         } catch (\Exception $e) {

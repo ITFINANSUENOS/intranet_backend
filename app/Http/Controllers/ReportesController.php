@@ -22,13 +22,13 @@ class ReportesController extends Controller
         $request->validate([
             'filename' => 'required|string',
             'content_type' => 'required|string',
-            'file_size' => 'required|integer' // <--- AÑADIDO
+            'file_size' => 'required|integer' 
         ]);
 
         $res = $this->service->generarUrlSubida(
             $request->filename, 
             $request->content_type,
-            $request->file_size // <--- AÑADIDO
+            $request->file_size
         );
         return response()->json($res);
     }
