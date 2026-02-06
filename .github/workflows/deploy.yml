@@ -23,11 +23,10 @@ jobs:
             # sudo composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
             # 3. Correr migraciones (¡Cuidado! Descomenta si lo necesitas)
             # sudo php artisan migrate --force
-            # 4. Limpiar y recachear configuración
-            sudo php artisan config:clear
-            sudo php artisan cache:clear
+            # 4. Limpiar y recachear configuración (Optimizado)
+            sudo php artisan optimize:clear
+            sudo php artisan config:cache
             sudo php artisan route:cache
             sudo php artisan view:cache
-            sudo php artisan config:cache
             # 5. Permisos (Asegurar que www-data siga siendo el dueño)
             sudo chown -R www-data:www-data /var/www/html
