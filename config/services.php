@@ -31,4 +31,9 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    // --- NUEVO: API DE PYTHON (App Runner) ---
+    'python_api' => [
+        'url' => env('PYTHON_API_URL', 'http://localhost:8001/api/v1'),
+    ],
+
 ];

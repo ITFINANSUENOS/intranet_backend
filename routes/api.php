@@ -18,28 +18,35 @@ use App\Http\Controllers\WalletController;
 
 use Illuminate\Support\Facades\Route;
 
-
-//Ruta de las API
 // Rutas de Acceso (NO Requieren Token)
 Route::post('/users/login', [AuthController::class, 'login']);
-Route::post('/users', [UserController::class, 'store']); // Registro
-
-
+Route::post('/users', [UserController::class, 'store']);
 
 Route::middleware('auth:api')->group(function () {
     Route::get('/news', [NewsController::class, 'index']);
     Route::get('/objectives', [ObjectiveController::class, 'index']);
     Route::get('/events', [EventController::class, 'index']);
-    // --- Rutas de Autenticación JWT ---
+    
+    // Autenticación JWT
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::post('/refresh', [AuthController::class, 'refresh']);
-    Route::get('/me', [AuthController::class, 'me']); // Devuelve el usuario actual
+    Route::get('/me', [AuthController::class, 'me']);
 
-    // --- 1. FUNCIONES GENERALES DE GESTIÓN (Administrador) ---
-    // Protegido por el ROL de Spatie
+    // --- ZONA PÚBLICA AUTENTICADA (Reportes y Wallet para todos) ---
+    Route::prefix('reportes')->group(function () {
+        Route::post('/generar-url', [ReportesController::class, 'generarUrlSubida']);
+        Route::post('/iniciar-procesamiento', [ReportesController::class, 'iniciarProcesamiento']);
+        Route::get('/activo', [ReportesController::class, 'getActivo']);
+    });
+
+    Route::prefix('wallet')->group(function () {
+        Route::get('/init/{modulo}', [WalletController::class, 'initDashboard']);
+        Route::post('/buscar', [WalletController::class, 'buscar']);
+    });
+
+    // --- ZONA ADMINISTRADOR (Super Usuario) ---
     Route::middleware('role:Super_usuario')->group(function () {
-        // El CRUD de Usuarios (excepto 'store', que es público para registro)
-        Route::get('/sso/inventario', [AuthController::class, 'generateInventorySsoUrl']);
+        Route::get('/sso/inventario', [AuthController::class, 'generateInventorySsoUrl']);    
         Route::get('/sso/mesa-de-ayuda', [AuthController::class, 'generateSsoUrl']);
         Route::apiResource('users', UserController::class)->except(['store']);
         Route::apiResource('cost-centers', CostCenterController::class);
@@ -49,66 +56,34 @@ Route::middleware('auth:api')->group(function () {
         Route::apiResource('regionals', RegionalController::class);
         Route::apiResource('positions', PositionController::class);
 
-        
         Route::post('/news', [NewsController::class, 'store']);
-        Route::post('/news/{news}', [NewsController::class, 'update']); // Usar POST para update con subida de archivo
+        Route::post('/news/{news}', [NewsController::class, 'update']);
         Route::delete('/news/{news}', [NewsController::class, 'destroy']);
 
-        
         Route::post('/objectives', [ObjectiveController::class, 'store']);
-        Route::put('/objectives/{objective}', [ObjectiveController::class, 'update']);
-        Route::delete('/objectives/{objective}', [ObjectiveController::class, 'destroy']);
+        Route::put('/objectives/{objective}', [ObjectiveController::class, 'update']);        
+        Route::delete('/objectives/{objective}', [ObjectiveController::class, 'destroy']);    
 
-        
         Route::post('/events', [EventController::class, 'store']);
-        
         Route::put('/events/{event}', [EventController::class, 'update']);
         Route::delete('/events/{event}', [EventController::class, 'destroy']);
-        // Agrgegar rutas para asignar y quitar roles a usuarios
-        // Rutas para Roles y Permisos
+        
         Route::apiResource('roles', RoleController::class);
         Route::apiResource('permissions', PermissionController::class);
-        // Asignar un rol a un usuario
-        Route::post('/users/{user}/roles', [UserRoleController::class, 'assignRole']);
-        // Quitar un rol a un usuario
+        Route::post('/users/{user}/roles', [UserRoleController::class, 'assignRole']);        
         Route::delete('/users/{user}/roles/{role}', [UserRoleController::class, 'removeRole']);
-        // --- NUEVAS RUTAS: Procesamiento de archivos DataCredito ---
-        Route::post('/procesamiento/generar-urls', [ProcesamientoDatacreditoController::class, 'generarUrls']);
-        Route::post('/procesamiento/iniciar', [ProcesamientoDatacreditoController::class, 'iniciarProceso']);
-        Route::get('/procesamiento/estado', [ProcesamientoDatacreditoController::class, 'verificarEstado']);
         
+        Route::post('/procesamiento/generar-urls', [ProcesamientoDatacreditoController::class, 'generarUrls']);
+        Route::post('/procesamiento/iniciar', [ProcesamientoDatacreditoController::class, 'iniciarProcesamiento']);
+        Route::get('/procesamiento/estado', [ProcesamientoDatacreditoController::class, 'verificarEstado']);
+
         Route::get('/news/{news}', [NewsController::class, 'show']);
         Route::get('/objectives/{objective}', [ObjectiveController::class, 'show']);
         Route::get('/events/{event}', [EventController::class, 'show']);
-       Route::prefix('reportes')->group(function () {
-        Route::post('/generar-url', [ReportesController::class, 'generarUrlSubida']);
-        Route::post('/iniciar-procesamiento', [ReportesController::class, 'iniciarProcesamiento']);
-        Route::get('/activo', [ReportesController::class, 'getActivo']);
     });
+});
 
-    // Rutas de visualización de datos (Wallet)
-    Route::prefix('wallet')->group(function () {
-        Route::get('/init/{modulo}', [WalletController::class, 'initDashboard']);
-        Route::post('/buscar', [WalletController::class, 'buscar']);
-    });
-
-    });
-    
-    });
-
-    // --- 2. MODULO DE INVENTARIO ---
-    Route::middleware('role:Asesor|Administrativo|Gestor|Super_usuario')->group(function () {
-         Route::get('/sso/inventario', [AuthController::class, 'generateInventorySsoUrl']);
-        Route::get('/sso/mesa-de-ayuda', [AuthController::class, 'generateSsoUrl']);
-      
-    });
-
-    // --- 3. MODULO MESA DE AYUDA ---
-    Route::middleware('role:Administrativo|Gestor|Super_usuario')->group(function () {
-        
-    });
-
-    // --- 4. MODULO DE CARTERA ---
-    Route::middleware('role:Gestor|Super_usuario')->group(function () {
-       
-    });
+Route::middleware('role:Asesor|Administrativo|Gestor|Super_usuario')->group(function () { 
+     Route::get('/sso/inventario', [AuthController::class, 'generateInventorySsoUrl']);   
+    Route::get('/sso/mesa-de-ayuda', [AuthController::class, 'generateSsoUrl']);
+});

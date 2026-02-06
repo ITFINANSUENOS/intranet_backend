@@ -12,11 +12,12 @@ class BasePythonService
 
     public function __construct()
     {
-        $this->baseUrl = env('PYTHON_API_URL'); // http://localhost:8001/api/v1
-        
+        // CORREGIDO: Usar config() en lugar de env()
+        $this->baseUrl = config('services.python_api.url'); 
+
         // Aquí puedes configurar headers globales si Python llegara a pedir Token
-        $this->http = Http::timeout(300) // Esperar hasta 60s si Python demora procesando
-                          ->acceptJson(); 
+        $this->http = Http::timeout(300) // Esperar hasta 60s si Python demora procesando     
+                          ->acceptJson();
     }
 
     /**
@@ -44,9 +45,9 @@ class BasePythonService
         if ($response->successful()) {
             return $response->json();
         }
-        
+
         // Lanza error para que lo capture el controlador
-        throw new Exception("Error Python ({$response->status()}): " . $response->body());
+        throw new Exception("Error Python ({$response->status()}): " . $response->body());    
     }
 
     protected function postMultipart($endpoint, $keyName, $file, $data = [])
@@ -55,8 +56,8 @@ class BasePythonService
         $fileStream = fopen($file->getRealPath(), 'r');
 
         $response = $this->http->attach(
-            $keyName, 
-            $fileStream, 
+            $keyName,
+            $fileStream,
             $file->getClientOriginalName()
         )->post("{$this->baseUrl}/{$endpoint}", $data);
 
